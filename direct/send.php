@@ -88,31 +88,6 @@ $channel->basic_publish($msg, $exchangeName, $routeName);
 
 echo " end 已发送\n";
 
-/*******开启回调start********/
-# 只开启一个消费者可以使用，否则大于一个 确认会发送到另外一个消费者队列中
-# 异步回调消息确认
-$channel->set_ack_handler(
-    function (AMQPMessage $message) {
-        echo '消费者已经消费：' . $message->body . PHP_EOL;
-    }
-);
-# 异步回调,消息丢失处理
-$channel->set_nack_handler(
-    function (AMQPMessage $message) {
-        echo '消息丢失' . $message->body . PHP_EOL;
-    }
-);
-
-#开启消息确认 ,
-$channel->confirm_select();
-for ($i = 0; $i < 1; $i++) {
-    $pushData = "确认";
-    $msg = new AMQPMessage($pushData);
-    $channel->basic_publish($msg, '', $queueName);
-}
-//阻塞等待消息确认 监听成功或失败返回结束
-$channel->wait_for_pending_acks();
-/*******开启回调end********/
 
 # 6. 关闭信道和链接
 $channel->close();

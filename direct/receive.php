@@ -1,6 +1,6 @@
 <?php
 /**
- * 消费者
+ * 消费者 direct  直连交换器
  */
 require_once  '../vendor/autoload.php';
 
