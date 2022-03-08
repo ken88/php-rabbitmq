@@ -10,7 +10,7 @@
 //$vhost = "";         #连接RabbitMQ服务器的vhost（服务器可以有多个vhost，虚拟主机，类似nginx的vhost）
 //配置信息
 $conn_args = array(
-    'host' => '127.0.0.1',
+    'host' => '172.17.0.5',
     'port' => '5672',
     'login' => 'guest',
     'password' => 'guest',
@@ -25,6 +25,8 @@ $conn = new AMQPConnection($conn_args);
 if (!$conn->connect()) {
     die("Cannot connect to the broker!\n");
 }
+
+# 创建通道
 $channel = new AMQPChannel($conn);
 
 //创建交换机

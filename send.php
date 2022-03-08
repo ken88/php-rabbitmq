@@ -4,7 +4,7 @@
 
 
 $conn_args = array(
-    'host' => '127.0.0.1',
+    'host' => '172.17.0.5',
     'port' => '5672',
     'login' => 'guest',
     'password' => 'guest',
@@ -32,7 +32,7 @@ date_default_timezone_set("Asia/Shanghai");
 for($i = 0 ; $i < 5; ++$i){
     sleep(1);//休眠1秒
     //消息内容
-    $message = "TEST MESSAGE!".date("H:i:sa");
+    $message = "gogo TEST MESSAGE!".date("H:i:sa");
     echo "Send Message:".$ex->publish($message, $k_route)."\n";
 }
 //$channel->commitTransaction(); //提交事务

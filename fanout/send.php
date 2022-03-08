@@ -1,19 +1,19 @@
 <?php
 # 通过 fanout 扇出交换发送数据
-require_once __DIR__ . '/vendor/autoload.php';
+require_once '../vendor/autoload.php';
 
-require_once __DIR__ . '/Rabbitmq.php';
+require_once '../Rabbitmq.php';
 
 use PhpAmqpLib\Message\AMQPMessage;
 $connection = RabbitMQ::init();
 
 # 2. 获取信道
-# $channel_id 信道id，不传则获取$channel[“”]信道，再无则循环$this->channle数组，下标从1到最大信道数找第一个不是AMQPChannel对象的下标，
-# 实例化并返回AMQPChannel对象，无则抛出异常No free channel ids
 $channel = $connection->channel();
 
+# 3. 创建交换机（Exchange）
 $channel->exchange_declare('logs', 'fanout', false, false, false);
 
+# 发送信息
 $data = "info: Hello World!";
 $msg = new AMQPMessage($data);
 

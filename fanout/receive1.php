@@ -1,7 +1,7 @@
 <?php
-require_once __DIR__ . '/vendor/autoload.php';
+require_once '../vendor/autoload.php';
 
-require_once __DIR__ . '/Rabbitmq.php';
+require_once '../Rabbitmq.php';
 
 use PhpAmqpLib\Message\AMQPMessage;
 $connection = RabbitMQ::init();
@@ -9,15 +9,17 @@ $connection = RabbitMQ::init();
 # 创建信道
 $channel = $connection->channel();
 
+# 创建交换机
 $channel->exchange_declare('logs', 'fanout', false, false, false);
 
 /**
+ * 创建消费者队列
  * $channel->queue_declare  参数注释：
  *  第一个参数 是队列的名字  （为空"" 默认会生成一个类似于amq.gen-DvTFerWvCSdkUIc4ie_M2g 的名字）
  *
  */
-list($queue_name, ,) = $channel->queue_declare("", false, false, true, false);
-
+list($queue_name, ,) = $channel->queue_declare("abc", false, false, true, false);
+echo '队列:'.$queue_name.'\n';
 $channel->queue_bind($queue_name, 'logs');
 
 echo " [*] Waiting for logs. To exit press CTRL+C\n";
