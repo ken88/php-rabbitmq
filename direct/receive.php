@@ -42,11 +42,11 @@ echo " [*] Waiting for messages. To exit press CTRL+C\n";
  * callback = null,   回调逻辑处理函数
  * */
 $channel->basic_consume($queueName, '', false, false, false, false, function ($msg) {
-    if ($msg->body != '确认'){
-        echo ' 接收到消息： '. $msg->body. "\n";
-        // basic_consume 第四个参数设置为false ，要手动确认ack
-        $msg->ack();
-    }
+    sleep(3);
+    echo ' 接收到消息： '. $msg->body. "\n";
+
+    // basic_consume 第四个参数设置为false ，要手动确认ack
+    $msg->ack();
 
 });
 
