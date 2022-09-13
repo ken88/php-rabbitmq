@@ -1,5 +1,6 @@
 <?php
 /**
+ * 延迟队列+死信队列3 生产者 死信队列DLX + 延迟时间TTL
  * direct  （直连模式）  也叫（路由模式）
  * 生产者 direct  直连交换器
  * 注释：direct Exchange – 处理路由键。需要将一个队列绑定到交换机上，要求该消息与一个特定的路由键完全匹配。
@@ -7,11 +8,18 @@
     例如：生产者 交换机叫excheng1 绑定的路由key 是orange
     那么消费者必须要 声明 交换机叫excheng1 ，路由key是orange才可以接收到消息
  */
-require_once '../vendor/autoload.php';
+require_once '../../vendor/autoload.php';
 
-require_once  '../Rabbitmq.php';
+require_once '../../Rabbitmq.php';
 
 use PhpAmqpLib\Message\AMQPMessage;
+
+$exchangeName = 'task_exchange'; # 普通交换机
+$queueName = 'task_queue'; # 普通队列
+$routeName = 'task_route'; # 普通路由
+$deadExchangeName = "orderDelayExchange"; # 死信交换机
+$deadQueueName = "orderDelayQueue"; # 死信队列
+$orderRouteName = "order_dead_route"; # 死信路由
 
 # 1. 创建链接服务
 $connection = RabbitMQ::init();
@@ -25,7 +33,7 @@ $connection = RabbitMQ::init();
 $channel = $connection->channel();
 
 /**
- * 3. 创建交换机（Exchange）
+ * 3. 创建普通交换机（Exchange）
  * exchange : task  交换机名字
  * type     : 交换机类型
  *          fanout  扇形交换器 会发送消息到它所知道的所有队列，每个消费者获取的消息都是一致的
@@ -35,45 +43,47 @@ $channel = $connection->channel();
  * durable = false, 是否持久化，设置false是存放到内存当中的，rabbitmq 重启后会丢失
  * auto_delete = true, 是否自动删除，当最后一个消费者断开链接之后队列是否自动被删除
  */
-$exchangeName = 'task_exchange';
-$channel->exchange_declare($exchangeName,'direct',false,true,false);
+
+//$channel->exchange_declare($exchangeName,\PhpAmqpLib\Exchange\AMQPExchangeType::FANOUT,false,true,false);
+$channel->exchange_declare($exchangeName,\PhpAmqpLib\Exchange\AMQPExchangeType::DIRECT,false,true,false);
+# 死信交换机
+$channel->exchange_declare($deadExchangeName,\PhpAmqpLib\Exchange\AMQPExchangeType::DIRECT,false,true,false);
 
 /**
- * 4. 创建消费者队列
+ * 4. 创建消费者普通队列
  * 非持久化队列,RabbitMQ退出或者崩溃时，该队列就不存在
  * 持久化队列（需要显示声明，第三个参数要设置为true），保存到磁盘，但不一定完全保证不丢失信息，因为保存总是要有时间的。
  * queue   : 队列名称
  * passive : 如果设置为true，存在则返回ok，否则就报错，设置false存在返回ok，不存在则自动创建
  * durable : 是否持久化，设置false是存放到内存当中的，rabbitmq 重启后会丢失
  * exclusive : 是否排他,指定该选项为true则队列只对当前链接有效，链接断开自动删除
- * auto_delete: 是否自删除
- * nowait  ：
+ * auto_delete : 是否自删除
+ * nowait  ：是否等待
  * */
-$queueName = 'task_queue';
-$channel->queue_declare($queueName, false, true, false, false,false);
 
+$args = new \PhpAmqpLib\Wire\AMQPTable();
+// 消息过期方式：设置 queue.normal 队列中消息5s之后过期
+$args->set('x-message-ttl', 5000);
+$args->set('x-dead-letter-exchange', $deadExchangeName);
+$args->set('x-dead-letter-routing-key', $orderRouteName);
+# 普通队列
+$channel->queue_declare($queueName, false, true, false, false,false,$args);
+# 死信队列
+$channel->queue_declare($deadQueueName,false, true, false, false,false);
 /**
  * 5. 绑定队列跟交换机
  * queue    ：队列名称
  * exchange ：交换机名称
  * routing_key ：路由key
  */
-$routeName = 'task_route';
+
+# 普通绑定
 $channel->queue_bind($queueName,$exchangeName,$routeName);
-
-
-# 4. 创建要发送的信息 ，可以创建多个消息
-/*
- * $message  string类型 要发送的消息
- * $properties array类型 设置的属性，比如设置该消息持久化[‘delivery_mode’=>2]
- * AMQPMessage 参数说明：
- *      例如 AMQPMessage($message); 没有第二个参数的时候，当rebbitmq服务挂了，可以重启rabbitmq服务，这个时候aaa队列的消息就会清空
- *      当 AMQPMessage($message,array('delivery_mode'=>AMQPMESSAGE::DELIVERY_MODE_PERSISTENT)) 传递第二个参数的时候，当rebbitmq服务挂了，
- *      可以重启rabbitmq服务，这个时候 “aaa”队列的数据还是会存在
- * */
+# 死信绑定
+$channel->queue_bind($deadQueueName,$deadExchangeName,$orderRouteName);
 
 /**
- * 5. 发送消息
+ * 发送消息
  * body ：string类型，要发送的消息
  * properties ：array类型 ，比如设置该消息持久化[‘delivery_mode’=>2]
  *      例如 AMQPMessage($message); 没有第二个参数的时候，当rebbitmq服务挂了，可以重启rabbitmq服务，这个时候aaa队列的消息就会清空
@@ -84,7 +94,7 @@ $channel->queue_bind($queueName,$exchangeName,$routeName);
 $data = [
     'id' => uniqid(),
     'create_time' => time(),
-    'message' => '我是生产者数据4'
+    'message' => '我是生产者数据2'
 ];
 //$msg = new AMQPMessage($message,array('delivery_mode'=>AMQPMESSAGE::DELIVERY_MODE_PERSISTENT));
 $msg = new AMQPMessage(json_encode($data,JSON_UNESCAPED_UNICODE));

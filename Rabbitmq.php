@@ -20,7 +20,7 @@ class RabbitMQ
     public static function init() {
         # 1. 创建连接
 
-        $host = "172.17.0.5"; # RabbitMQ服务器主机IP地址
+        $host = "172.18.0.19"; # RabbitMQ服务器主机IP地址
         $port = 5672;           # RabbitMQ服务器端口
         $user = "guest";   # 连接RabbitMQ服务器的用户名
         $password = "guest";      # 连接RabbitMQ服务器的用户密码

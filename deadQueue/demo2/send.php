@@ -1,5 +1,6 @@
 <?php
 /**
+ * 死信1.当消息被拒绝 生产者
  * direct  （直连模式）  也叫（路由模式）
  * 生产者 direct  直连交换器
  * 注释：direct Exchange – 处理路由键。需要将一个队列绑定到交换机上，要求该消息与一个特定的路由键完全匹配。
@@ -7,9 +8,9 @@
     例如：生产者 交换机叫excheng1 绑定的路由key 是orange
     那么消费者必须要 声明 交换机叫excheng1 ，路由key是orange才可以接收到消息
  */
-require_once '../vendor/autoload.php';
+require_once '../../vendor/autoload.php';
 
-require_once  '../Rabbitmq.php';
+require_once  '../../Rabbitmq.php';
 
 use PhpAmqpLib\Message\AMQPMessage;
 
@@ -35,7 +36,7 @@ $channel = $connection->channel();
  * durable = false, 是否持久化，设置false是存放到内存当中的，rabbitmq 重启后会丢失
  * auto_delete = true, 是否自动删除，当最后一个消费者断开链接之后队列是否自动被删除
  */
-$exchangeName = 'task_exchange';
+$exchangeName = 'task_exchange1';
 $channel->exchange_declare($exchangeName,'direct',false,true,false);
 
 /**
@@ -49,8 +50,12 @@ $channel->exchange_declare($exchangeName,'direct',false,true,false);
  * auto_delete: 是否自删除
  * nowait  ：
  * */
-$queueName = 'task_queue';
-$channel->queue_declare($queueName, false, true, false, false,false);
+$queueName = 'task_queue1';
+// 声明业务队列的死信交换机
+$args = new \PhpAmqpLib\Wire\AMQPTable();
+$args->set('x-dead-letter-exchange', 'dl_exchange');  # 配置死信交换机
+$args->set('x-dead-letter-routing-key', 'dl_route_key'); # 配置 Routing Key，路由到 dl_exchange
+$channel->queue_declare($queueName, false, false, false, false,false,$args);
 
 /**
  * 5. 绑定队列跟交换机
@@ -58,7 +63,7 @@ $channel->queue_declare($queueName, false, true, false, false,false);
  * exchange ：交换机名称
  * routing_key ：路由key
  */
-$routeName = 'task_route';
+$routeName = 'task_route1';
 $channel->queue_bind($queueName,$exchangeName,$routeName);
 
 
@@ -84,7 +89,7 @@ $channel->queue_bind($queueName,$exchangeName,$routeName);
 $data = [
     'id' => uniqid(),
     'create_time' => time(),
-    'message' => '我是生产者数据4'
+    'message' => '我是生产者数据3'
 ];
 //$msg = new AMQPMessage($message,array('delivery_mode'=>AMQPMESSAGE::DELIVERY_MODE_PERSISTENT));
 $msg = new AMQPMessage(json_encode($data,JSON_UNESCAPED_UNICODE));

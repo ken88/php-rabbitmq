@@ -1,5 +1,6 @@
 <?php
 /**
+ * 死信2.当队列达到最大长度 生产者
  * direct  （直连模式）  也叫（路由模式）
  * 生产者 direct  直连交换器
  * 注释：direct Exchange – 处理路由键。需要将一个队列绑定到交换机上，要求该消息与一个特定的路由键完全匹配。
@@ -7,9 +8,9 @@
     例如：生产者 交换机叫excheng1 绑定的路由key 是orange
     那么消费者必须要 声明 交换机叫excheng1 ，路由key是orange才可以接收到消息
  */
-require_once '../vendor/autoload.php';
+require_once '../../vendor/autoload.php';
 
-require_once  '../Rabbitmq.php';
+require_once  '../../Rabbitmq.php';
 
 use PhpAmqpLib\Message\AMQPMessage;
 
@@ -35,7 +36,7 @@ $channel = $connection->channel();
  * durable = false, 是否持久化，设置false是存放到内存当中的，rabbitmq 重启后会丢失
  * auto_delete = true, 是否自动删除，当最后一个消费者断开链接之后队列是否自动被删除
  */
-$exchangeName = 'task_exchange';
+$exchangeName = 'task_exchange2';
 $channel->exchange_declare($exchangeName,'direct',false,true,false);
 
 /**
@@ -49,8 +50,26 @@ $channel->exchange_declare($exchangeName,'direct',false,true,false);
  * auto_delete: 是否自删除
  * nowait  ：
  * */
-$queueName = 'task_queue';
-$channel->queue_declare($queueName, false, true, false, false,false);
+$queueName = 'task_queue2';
+
+$args = new \PhpAmqpLib\Wire\AMQPTable();
+/*
+ * 可以通过设置 x-max-length （队列声明参数，非负整数）来设置最大消息数。
+ * 可以通过设置 x-max-length-bytes （队列声明参数，非负整数）来设置最大长度（以字节为单位）。
+ * */
+$args->set('x-max-length', 5);  # 设置队列长度限制 // 或 'x-max-length-bytes' => 1024
+/*
+ * 1.3.2 队列溢出行为
+Queue Overflow Behaviour。可以通过 x-overflow （队列声明参数，字符串）来设置溢出行为 。
+可选值为 drop-head（默认）、 reject-publish 或 reject-publish-dlx。
+drop-head：从队列前端（即队列中最旧的消息）删除或死信消息。
+reject-publish：直接丢弃最近发布的消息。假设 x-max-length = 5，发送消息 1-10，最终剩消息 1-5。
+reject-publish-dlx：最近发布的消息会进入死信队列。假设 x-max-length = 5，发送消息 1-10，最终消息 1-5 进入队列，消息 6-10 会进入死信队列。
+ * */
+$args->set('x-overflow', 'reject-publish-dlx');
+$args->set('x-dead-letter-exchange', 'dl_size_exchange');  # 配置死信交换机
+$args->set('x-dead-letter-routing-key', 'dl_size_route_key'); # 配置 Routing Key，路由到 dl_size_exchange
+$channel->queue_declare($queueName, false, false, false, false,false,$args);
 
 /**
  * 5. 绑定队列跟交换机
@@ -58,7 +77,7 @@ $channel->queue_declare($queueName, false, true, false, false,false);
  * exchange ：交换机名称
  * routing_key ：路由key
  */
-$routeName = 'task_route';
+$routeName = 'task_route2';
 $channel->queue_bind($queueName,$exchangeName,$routeName);
 
 
@@ -80,16 +99,21 @@ $channel->queue_bind($queueName,$exchangeName,$routeName);
  *      当 AMQPMessage($message,array('delivery_mode'=>AMQPMESSAGE::DELIVERY_MODE_PERSISTENT))
  *      传递第二个参数的时候，当rebbit，可以重启rabbitmq服务，这个时候 “aaa”队列的数据还是会存在
  */
-# 发送的消息
-$data = [
-    'id' => uniqid(),
-    'create_time' => time(),
-    'message' => '我是生产者数据4'
-];
+# 这里设置发送9条消息，消费者进程全部关闭，生产成功后，开启消费者1与死信队列两个消费，消费者会执行5条数据，死信队列执行3条
+for ($i = 1 ; $i < 9; $i++){
+    # 发送的消息
+    $data = [
+        'id' => uniqid(),
+        'create_time' => time(),
+        'message' => '我是生产者数据'.$i
+    ];
 //$msg = new AMQPMessage($message,array('delivery_mode'=>AMQPMESSAGE::DELIVERY_MODE_PERSISTENT));
-$msg = new AMQPMessage(json_encode($data,JSON_UNESCAPED_UNICODE));
+    $msg = new AMQPMessage(json_encode($data,JSON_UNESCAPED_UNICODE));
 
-$channel->basic_publish($msg, $exchangeName, $routeName);
+    $channel->basic_publish($msg, $exchangeName, $routeName);
+}
+
+
 
 
 echo " end 已发送\n";
